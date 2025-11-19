@@ -1,0 +1,14 @@
+{
+  "obras": [
+    {"id": 1, "titulo": "Hamlet", "genero": "Drama", "descripcion": "Tragedia clásica", "elenco": ["Actor A", "Actor B"]},
+    {"id": 2, "titulo": "La Casa de Bernarda Alba", "genero": "Drama", "descripcion": "Obra de Lorca", "elenco": ["Actriz C", "Actriz D"]}
+  ],
+  "salas": [
+    {"id": 1, "nombre": "Sala Principal", "ubicacion": "Platea baja", "capacidad": 200},
+    {"id": 2, "nombre": "Sala Secundaria", "ubicacion": "Palcos", "capacidad": 50}
+  ],
+  "entradas": [
+    {"codigo": "E001", "obra_id": 1, "cliente": "Juan Pérez", "fecha_compra": "2025-09-01", "ubicacion": "Platea baja", "precio": 5000, "medio_pago": "Tarjeta"},
+    {"codigo": "E002", "obra_id": 2, "cliente": "María López", "fecha_compra": "2025-10-02", "ubicacion": "Palco", "precio": 3000, "medio_pago": "Efectivo"}
+  ]
+}
