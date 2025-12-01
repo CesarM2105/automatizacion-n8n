@@ -1,4 +1,4 @@
-import os 
+import os
 import json
 import time
 import pandas as pd
@@ -13,7 +13,7 @@ console = Console()
 load_dotenv()
 
 # ======================================================
-# 🎭 ESTILO VISUAL DE LA CONSOLA
+# 🎭 BIENVENIDA LIMPIA Y PROFESIONAL
 # ======================================================
 
 def banner():
@@ -24,37 +24,19 @@ def banner():
     print("║                Teatro Artech - Python + n8n          ║")
     print("╚══════════════════════════════════════════════════════╝\n")
 
+def bienvenida():
+    console.print("[bold cyan]Bienvenido al asistente inteligente del Teatro Artech.[/bold cyan]\n")
+    console.print(
+        "Podés realizar consultas sobre obras, funciones, salas, ventas, reportes "
+        "y cualquier información disponible en el sistema.\n"
+    )
+    console.print("⚡ El sistema interpreta tu consulta, la envía a n8n y devuelve la respuesta automáticamente.")
+    console.print("📄 Si la respuesta contiene datos tabulares, también se genera un archivo Excel.\n")
+    console.print("[bold yellow]Escribí tu consulta abajo o ingresá 'salir' para finalizar.[/bold yellow]\n")
 
-def mostrar_menu():
-    console.print("📌 [bold cyan]Opciones disponibles:[/bold cyan]\n")
-    print("1️⃣  Consulta general (IA + SQL + n8n)")
-    print("2️⃣  Ejemplos de consultas")
-    print("3️⃣  Salir\n")
-
-
-def ejemplos():
-    console.print("\n📘 [bold cyan]EJEMPLOS DE CONSULTAS[/bold cyan]\n")
-    print("🎭 Obras:")
-    print("   • ¿Quiénes son los actores de Hamlet?")
-    print("   • ¿Qué obras hay esta semana?")
-    print("   • Mostrame la descripción de la obra El Rey León.\n")
-    
-    print("💺 Salas y Ubicaciones:")
-    print("   • ¿Qué capacidad tiene la sala principal?")
-    print("   • Mostrame las ubicaciones de la sala Roja.\n")
-    
-    print("🎟 Entradas:")
-    print("   • ¿Cuántas entradas se vendieron en octubre?")
-    print("   • ¿Cuáles fueron las ventas por medio de pago?\n")
-
-    print("📄 Reportes:")
-    print("   • Generar Excel con la cartelera del mes.")
-    print("   • Enviar por mail listado de compras de un cliente.\n")
-
-    print("💡 Todo lo procesa n8n con SQL + API + IA.\n")
 
 # ======================================================
-# 🔥 FORMATO TABLA + EXCEL
+# 📊 TABLAS + EXPORTACIÓN A EXCEL
 # ======================================================
 
 def imprimir_tabla(datos):
@@ -82,7 +64,7 @@ def guardar_excel(datos):
 
 
 # ======================================================
-# 🔥 ANIMACIÓN “CARGANDO…”
+# 🔄 ANIMACIÓN “Procesando…”
 # ======================================================
 
 def esperar_respuesta():
@@ -92,17 +74,16 @@ def esperar_respuesta():
         transient=True
     ) as progress:
         progress.add_task("", total=None)
-        time.sleep(1.5)
+        time.sleep(1.2)
 
 
 # ======================================================
-# 🚀 PROCESAR RESPUESTA DEL WEBHOOK N8N
+# 📩 PROCESAR RESPUESTA DE N8N
 # ======================================================
 
 def procesar_respuesta(respuesta):
     console.print("\n[bold green]📩 Respuesta del sistema:[/bold green]\n")
 
-    # Error de conexión
     if isinstance(respuesta, dict) and "error" in respuesta:
         console.print(f"[bold red]❌ Error:[/bold red] {respuesta['error']}")
         return
@@ -113,15 +94,14 @@ def procesar_respuesta(respuesta):
     except:
         contenido = respuesta
 
-    # Si es texto simple
+    # Texto simple
     if isinstance(contenido, str):
         console.print("[bold cyan]" + contenido.capitalize() + "[/bold cyan]")
         return 
     
-    # Si es tabla
+    # Datos en tabla
     if isinstance(contenido, list):
         imprimir_tabla(contenido)
-
         try:
             console.print("\n[bold yellow]📁 Generando archivo Excel...[/bold yellow]")
             path = guardar_excel(contenido)
@@ -134,44 +114,32 @@ def procesar_respuesta(respuesta):
 
 
 # ======================================================
-# 🎮 APLICACIÓN PRINCIPAL
+# 🚀 APLICACIÓN PRINCIPAL – CONSULTA LIBRE
 # ======================================================
 
 def main():
     while True:
         banner()
-        mostrar_menu()
+        bienvenida()
 
-        opcion = input("👉 Seleccioná una opción (1-3): ").strip()
+        consulta = input("💬 Escribí tu consulta: ").strip()
 
-        if opcion == "3":
+        if consulta.lower() in ("salir", "exit", "quit"):
             console.print("\n👋 [bold cyan]¡Saliendo del sistema inteligente![/bold cyan]")
             break
 
-        if opcion == "2":
-            banner()
-            ejemplos()
-            input("\nENTER para volver al menú...")
+        if not consulta:
+            console.print("[bold red]⚠ Ingresá una consulta válida.[/bold red]")
+            time.sleep(1)
             continue
 
-        if opcion == "1":
-            consulta = input("\n💬 Escribí tu consulta: ").strip()
+        esperar_respuesta()
+        respuesta = enviar_a_n8n({"query": consulta})
+        procesar_respuesta(respuesta)
 
-            if not consulta:
-                console.print("[bold red]⚠ Escribí una consulta válida.[/bold red]")
-                input("\nENTER para continuar...")
-                continue
+        print("\n" + "-" * 60 + "\n")
+        input("ENTER para realizar otra consulta...")
 
-            esperar_respuesta()
-            respuesta = enviar_a_n8n({"query": consulta})
-            procesar_respuesta(respuesta)
-
-            print("\n" + "-"*60 + "\n")
-            input("ENTER para continuar...")
-            continue
-
-        console.print("[bold red]⚠ Opción inválida[/bold red]")
-        input("\nENTER para continuar...")
 
 if __name__ == "__main__":
     main()
