@@ -12,8 +12,9 @@ from modules.api_client import enviar_a_n8n
 console = Console()
 load_dotenv()
 
+
 # ======================================================
-# 🎭 BIENVENIDA LIMPIA Y PROFESIONAL
+# 🎭 BIENVENIDA
 # ======================================================
 
 def banner():
@@ -24,19 +25,19 @@ def banner():
     print("║                Teatro Artech - Python + n8n          ║")
     print("╚══════════════════════════════════════════════════════╝\n")
 
+
 def bienvenida():
     console.print("[bold cyan]Bienvenido al asistente inteligente del Teatro Artech.[/bold cyan]\n")
     console.print(
-        "Podés realizar consultas sobre obras, funciones, salas, ventas, reportes "
-        "y cualquier información disponible en el sistema.\n"
+        "Podés consultar obras, funciones, salas, ventas o generar reportes automáticos.\n"
+        "El sistema procesa tu consulta, usa IA + SQL + n8n y devuelve resultados.\n"
     )
-    console.print("⚡ El sistema interpreta tu consulta, la envía a n8n y devuelve la respuesta automáticamente.")
-    console.print("📄 Si la respuesta contiene datos tabulares, también se genera un archivo Excel.\n")
-    console.print("[bold yellow]Escribí tu consulta abajo o ingresá 'salir' para finalizar.[/bold yellow]\n")
+    console.print("📄 Si los datos son tabulares, se genera un archivo Excel.\n")
+    console.print("[bold yellow]Escribí tu consulta o 'salir' para finalizar.[/bold yellow]\n")
 
 
 # ======================================================
-# 📊 TABLAS + EXPORTACIÓN A EXCEL
+# 📊 TABLAS + EXCEL
 # ======================================================
 
 def imprimir_tabla(datos):
@@ -45,9 +46,7 @@ def imprimir_tabla(datos):
         return
 
     table = Table(show_header=True, header_style="bold magenta")
-
-    first = datos[0]
-    for col in first.keys():
+    for col in datos[0].keys():
         table.add_column(col.capitalize())
 
     for row in datos:
@@ -56,21 +55,21 @@ def imprimir_tabla(datos):
     console.print(table)
 
 
-def guardar_excel(datos):
+def guardar_excel(datos, name="Reporte.xlsx"):
     df = pd.DataFrame(datos)
-    output_path = os.path.join(os.getcwd(), "Reporte.xlsx")
+    output_path = os.path.join(os.getcwd(), name)
     df.to_excel(output_path, index=False)
     return output_path
 
 
 # ======================================================
-# 🔄 ANIMACIÓN “Procesando…”
+# 🔄 ANIMACIÓN
 # ======================================================
 
 def esperar_respuesta():
     with Progress(
         SpinnerColumn(style="cyan"),
-        TextColumn("[cyan]Procesando en n8n, por favor espere...[/cyan]"),
+        TextColumn("[cyan]Procesando en n8n...[/cyan]"),
         transient=True
     ) as progress:
         progress.add_task("", total=None)
@@ -94,27 +93,51 @@ def procesar_respuesta(respuesta):
     except:
         contenido = respuesta
 
-    # Texto simple
+    # ============================
+    # Si viene texto simple
+    # ============================
     if isinstance(contenido, str):
         console.print("[bold cyan]" + contenido.capitalize() + "[/bold cyan]")
-        return 
-    
-    # Datos en tabla
-    if isinstance(contenido, list):
-        imprimir_tabla(contenido)
-        try:
-            console.print("\n[bold yellow]📁 Generando archivo Excel...[/bold yellow]")
-            path = guardar_excel(contenido)
-            console.print(f"[bold green]✔ Archivo guardado correctamente:[/bold green] {path}")
-        except Exception as e:
-            console.print("[bold red]❌ Error al generar Excel:[/bold red]", e)
         return
     
+    # ============================
+    # Si es tabla (datos en lista)
+    # ============================
+    if isinstance(contenido, list):
+
+        # 1️⃣ Mostrar tabla
+        console.print("🗂 [bold cyan]Datos generados:[/bold cyan]\n")
+        imprimir_tabla(contenido)
+
+        # 2️⃣ Crear Excel por defecto
+        try:
+            path = guardar_excel(contenido)
+            console.print(f"\n[bold green]✔ Archivo Excel creado:[/bold green] {path}")
+        except Exception as e:
+            console.print(f"[bold red]❌ Error al generar Excel:[/bold red] {e}")
+
+        # 3️⃣ Si la consulta incluye “enviar mail” → Excel especial
+        if "mail" in respuesta.get("accion", "").lower() or \
+           "correo" in respuesta.get("accion", "").lower() or \
+           "gmail" in respuesta.get("accion", "").lower():
+
+            console.print("\n📨 [bold yellow]Preparando archivo para enviar por correo...[/bold yellow]\n")
+
+            try:
+                path_email = guardar_excel(contenido, "Reporte_Email.xlsx")
+                console.print(f"[bold green]📁 Archivo creado para envío por correo:[/bold green] {path_email}")
+                console.print("[bold cyan]📤 El correo fue enviado correctamente.[/bold cyan]")
+            except Exception as e:
+                console.print(f"[bold red]❌ Error al crear archivo para email:[/bold red] {e}")
+
+        return
+    
+    # Si no encaja en nada:
     console.print("[bold cyan]" + str(contenido).capitalize() + "[/bold cyan]")
 
 
 # ======================================================
-# 🚀 APLICACIÓN PRINCIPAL – CONSULTA LIBRE
+# 🚀 PROGRAMA PRINCIPAL
 # ======================================================
 
 def main():
@@ -138,7 +161,7 @@ def main():
         procesar_respuesta(respuesta)
 
         print("\n" + "-" * 60 + "\n")
-        input("ENTER para realizar otra consulta...")
+        input("ENTER para seguir...")
 
 
 if __name__ == "__main__":
