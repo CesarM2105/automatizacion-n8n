@@ -1,3 +1,4 @@
+
 import os
 import json
 import time
@@ -16,26 +17,26 @@ load_dotenv()
 # ======================================================
 # 📂 CONFIGURACIÓN DE RUTAS DE DESCARGA
 # ======================================================
+
 def obtener_ruta_descargas():
     """Retorna la ruta raíz del usuario (Desktop o Descargas según SO)"""
     home = os.path.expanduser("~")
     
     if platform.system() == "Windows":
-        # Windows: C:\Users\Usuario\Desktop
         desktop = os.path.join(home, "Desktop")
         return desktop if os.path.exists(desktop) else home
     else:
-        # Linux/Mac: ~/Desktop o ~/Descargas
         desktop = os.path.join(home, "Desktop")
         descargas = os.path.join(home, "Descargas")
         if os.path.exists(desktop):
             return desktop
-        elif os.path.exists(descargas):
+        if os.path.exists(descargas):
             return descargas
         return home
 
+
 # ======================================================
-# 🎭 BIENVENIDA
+# 🎭 BIENVENIDA LIMPIA
 # ======================================================
 
 def banner():
@@ -46,30 +47,28 @@ def banner():
     print("║                Teatro Artech - Python + n8n          ║")
     print("╚══════════════════════════════════════════════════════╝\n")
 
-
 def bienvenida():
     console.print("[bold cyan]Bienvenido al asistente inteligente del Teatro Artech.[/bold cyan]\n")
     console.print(
-        "Podés consultar obras, funciones, salas, ventas o generar reportes automáticos.\n"
-        "El sistema procesa tu consulta, usa IA + SQL + n8n y devuelve resultados.\n"
+        "Podés realizar consultas sobre obras, funciones, salas, ventas y reportes.\n"
+        "El sistema interpreta tu consulta, la envía a n8n y devuelve la respuesta automáticamente.\n"
     )
-    console.print("📄 Si los datos son tabulares, se genera un archivo Excel.\n")
-    console.print("[bold yellow]Escribí tu consulta o 'salir' para finalizar.[/bold yellow]\n")
+    console.print("📄 Si la respuesta contiene datos tabulares, se genera un archivo Excel y CSV.\n")
+    console.print("[bold yellow]Escribí tu consulta abajo o ingresá 'salir'.[/bold yellow]\n")
 
 
 # ======================================================
-# 📊 TABLAS + EXCEL
+# 📊 TABLAS + EXPORTACIÓN A EXCEL
 # ======================================================
 
 def imprimir_tabla(datos):
     if not datos:
-        console.print("[bold red]No hay datos para mostrar[/bold red]")
+        console.print("[bold red]No hay datos para mostrar.[/bold red]")
         return
 
     table = Table(show_header=True, header_style="bold magenta")
 
-    first = datos[0]
-    for col in first.keys():
+    for col in datos[0].keys():
         table.add_column(col.capitalize())
 
     for row in datos:
@@ -79,49 +78,64 @@ def imprimir_tabla(datos):
 
 
 def guardar_excel(datos, nombre="Reporte"):
-    """Guarda datos en archivo Excel en la carpeta de descargas del usuario"""
+    """Guarda archivo Excel y notifica al usuario."""
     try:
         df = pd.DataFrame(datos)
         descargas = obtener_ruta_descargas()
-        output_path = os.path.join(descargas, f"{nombre}_{int(time.time())}.xlsx")
-        df.to_excel(output_path, index=False)
-        return output_path
+        path = os.path.join(descargas, f"{nombre}_{int(time.time())}.xlsx")
+        df.to_excel(path, index=False)
+
+        console.print(f"\n[bold green]✔ Archivo Excel generado correctamente[/bold green]")
+        console.print(f"[yellow]📁 Ubicación:[/yellow] [cyan]{path}[/cyan]\n")
+        return path
+
     except Exception as e:
         console.print(f"[bold red]❌ Error al guardar Excel:[/bold red] {e}")
         return None
 
 
 def guardar_csv(datos, nombre="Reporte"):
-    """Guarda datos en archivo CSV en la carpeta de descargas del usuario"""
+    """Guarda archivo CSV y notifica al usuario."""
     try:
         df = pd.DataFrame(datos)
         descargas = obtener_ruta_descargas()
-        output_path = os.path.join(descargas, f"{nombre}_{int(time.time())}.csv")
-        df.to_csv(output_path, index=False)
-        return output_path
+        path = os.path.join(descargas, f"{nombre}_{int(time.time())}.csv")
+        df.to_csv(path, index=False)
+
+        console.print(f"[bold green]✔ Archivo CSV generado correctamente[/bold green]")
+        console.print(f"[yellow]📁 Ubicación:[/yellow] [cyan]{path}[/cyan]\n")
+        return path
+
     except Exception as e:
         console.print(f"[bold red]❌ Error al guardar CSV:[/bold red] {e}")
         return None
 
 
+# ======================================================
+# 🔍 DETECTOR DE TIPO DE RESPUESTA
+# ======================================================
+
 def detectar_tipo_respuesta(contenido):
-    """Detecta si la respuesta es de email, SQL o datos generales"""
+    """Detecta si la respuesta es email, tabla o genérica."""
     if isinstance(contenido, dict):
         claves = [k.lower() for k in contenido.keys()]
-        if any(x in claves for x in ["email", "correo", "mail", "mensaje", "asunto"]):
+        if any(x in claves for x in ["email", "correo", "mensaje", "asunto"]):
             return "email"
-    
+        if "output" in claves:
+            return "email_output"
+
     if isinstance(contenido, list) and len(contenido) > 0:
         if isinstance(contenido[0], dict):
             claves = [k.lower() for k in contenido[0].keys()]
-            if any(x in claves for x in ["email", "correo", "mail", "nombre", "teléfono", "dhi"]):
+            if any(x in claves for x in ["email", "correo", "nombre"]):
                 return "email"
-    
-    return "generic"
+        return "tabla"
+
+    return "texto"
 
 
 # ======================================================
-# 🔄 ANIMACIÓN
+# 🔄 ANIMACIÓN “Procesando…”
 # ======================================================
 
 def esperar_respuesta():
@@ -135,9 +149,8 @@ def esperar_respuesta():
 
 
 # ======================================================
-# 📩 PROCESAR RESPUESTA DE N8N
+# 📩 PROCESAR RESPUESTA (LIMPIO, PROFESIONAL, ORDENADO)
 # ======================================================
-
 
 def procesar_respuesta(respuesta):
     console.print("\n[bold green]📩 Respuesta del sistema:[/bold green]\n")
@@ -148,94 +161,85 @@ def procesar_respuesta(respuesta):
 
     try:
         contenido = respuesta.get("resultado", respuesta)
-        contenido = json.loads(contenido) if isinstance(contenido, str) else contenido
+        if isinstance(contenido, str):
+            contenido = json.loads(contenido)
     except:
         contenido = respuesta
 
-    tipo_respuesta = detectar_tipo_respuesta(contenido)
+    tipo = detectar_tipo_respuesta(contenido)
 
-    # Texto simple
-    if isinstance(contenido, str):
-        console.print("[bold cyan]" + contenido.capitalize() + "[/bold cyan]")
-        return 
-    
-    # Datos en tabla (lista de registros)
-    if isinstance(contenido, list):
+    # 👉 1) Texto simple
+    if tipo == "texto":
+        console.print(f"[cyan]{str(contenido)}[/cyan]\n")
+        return
+
+    # 👉 2) Email simple
+    if tipo == "email" and isinstance(contenido, dict):
+        console.print("[bold cyan]📧 Datos del correo:[/bold cyan]")
+        tabla = Table(show_header=True, header_style="bold cyan")
+        tabla.add_column("Campo")
+        tabla.add_column("Valor")
+
+        for k, v in contenido.items():
+            tabla.add_row(k.upper(), str(v))
+
+        console.print(tabla)
+        return
+
+    # 👉 3) Email con output (respuesta generada)
+    if tipo == "email_output" and "output" in contenido:
+        texto = contenido["output"]
+        console.print("[bold cyan]📧 Resultado:[/bold cyan]")
+        console.print(f"[italic]{texto}[/italic]\n")
+
+        # Guardar archivo
+        try:
+            descargas = obtener_ruta_descargas()
+            path = os.path.join(descargas, f"Email_{int(time.time())}.txt")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(texto)
+
+            console.print(f"[bold green]✔ Confirmación guardada en:[/bold green] [cyan]{path}[/cyan]\n")
+        except Exception as e:
+            console.print(f"[bold red]❌ Error al guardar archivo:[/bold red] {e}")
+
+        return
+
+    # 👉 4) Tablas
+    if tipo == "tabla" and isinstance(contenido, list):
         imprimir_tabla(contenido)
-        
-        # Detectar tipo de datos para nombrar el reporte
-        nombre_reporte = "Reporte_Correos" if tipo_respuesta == "email" else "Reporte_Datos"
-        
-        try:
-            console.print("\n[bold yellow]📁 Generando archivo Excel...[/bold yellow]")
-            path = guardar_excel(contenido, nombre_reporte)
-            if path:
-                console.print(f"[bold green]✔ Excel guardado:[/bold green] {path}")
-        except Exception as e:
-            console.print("[bold red]❌ Error al generar Excel:[/bold red]", e)
-        
-        try:
-            console.print("[bold yellow]📁 Generando archivo CSV...[/bold yellow]")
-            path_csv = guardar_csv(contenido, nombre_reporte)
-            if path_csv:
-                console.print(f"[bold green]✔ CSV guardado:[/bold green] {path_csv}")
-        except Exception as e:
-            console.print("[bold red]❌ Error al generar CSV:[/bold red]", e)
+        guardar_excel(contenido, "Reporte_Datos")
+        guardar_csv(contenido, "Reporte_Datos")
         return
-    
-    # Datos en diccionario (email único o resultado único)
-    if isinstance(contenido, dict) and tipo_respuesta == "email":
-        console.print("[bold green]📧 Datos de Correo:[/bold green]")
-        table = Table(show_header=True, header_style="bold cyan")
-        table.add_column("Campo", style="cyan")
-        table.add_column("Valor", style="magenta")
-        
-        for key, value in contenido.items():
-            table.add_row(str(key).upper(), str(value)[:80])  # Limitar longitud de valores
-        
-        console.print(table)
-        
-        # Guardar como CSV
-        try:
-            path_csv = guardar_csv([contenido], "Reporte_Email")
-            if path_csv:
-                console.print(f"[bold green]✔ CSV guardado:[/bold green] {path_csv}")
-        except Exception as e:
-            console.print("[bold red]❌ Error al generar CSV:[/bold red]", e)
-        return
-    
-    console.print("[bold cyan]" + str(contenido).capitalize() + "[/bold cyan]")
 
-
+    # Fallback
+    console.print(f"[cyan]{contenido}[/cyan]")
 
 
 # ======================================================
-# 🚀 PROGRAMA PRINCIPAL
+# 🧠 LOOP PRINCIPAL
 # ======================================================
 
 def main():
-    while True:
-        banner()
-        bienvenida()
+    banner()
+    bienvenida()
 
+    while True:
         consulta = input("💬 Escribí tu consulta: ").strip()
 
         if consulta.lower() in ("salir", "exit", "quit"):
-            console.print("\n👋 [bold cyan]¡Saliendo del sistema inteligente![/bold cyan]")
+            console.print("\n👋 [bold cyan]¡Saliendo del sistema![/bold cyan]")
             break
 
         if not consulta:
             console.print("[bold red]⚠ Ingresá una consulta válida.[/bold red]")
-            time.sleep(1)
             continue
 
         esperar_respuesta()
         respuesta = enviar_a_n8n({"query": consulta})
         procesar_respuesta(respuesta)
 
-        print("\n" + "-" * 60 + "\n")
-        input("ENTER para seguir...")
-
+        input("\nENTER para nueva consulta...")
 
 if __name__ == "__main__":
     main()
