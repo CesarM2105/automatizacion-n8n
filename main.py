@@ -2,6 +2,7 @@ import os
 import json
 import time
 import pandas as pd
+import platform
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
@@ -12,6 +13,26 @@ from modules.api_client import enviar_a_n8n
 console = Console()
 load_dotenv()
 
+# ======================================================
+# 📂 CONFIGURACIÓN DE RUTAS DE DESCARGA
+# ======================================================
+def obtener_ruta_descargas():
+    """Retorna la ruta raíz del usuario (Desktop o Descargas según SO)"""
+    home = os.path.expanduser("~")
+    
+    if platform.system() == "Windows":
+        # Windows: C:\Users\Usuario\Desktop
+        desktop = os.path.join(home, "Desktop")
+        return desktop if os.path.exists(desktop) else home
+    else:
+        # Linux/Mac: ~/Desktop o ~/Descargas
+        desktop = os.path.join(home, "Desktop")
+        descargas = os.path.join(home, "Descargas")
+        if os.path.exists(desktop):
+            return desktop
+        elif os.path.exists(descargas):
+            return descargas
+        return home
 
 # ======================================================
 # 🎭 BIENVENIDA
@@ -46,7 +67,9 @@ def imprimir_tabla(datos):
         return
 
     table = Table(show_header=True, header_style="bold magenta")
-    for col in datos[0].keys():
+
+    first = datos[0]
+    for col in first.keys():
         table.add_column(col.capitalize())
 
     for row in datos:
@@ -55,11 +78,46 @@ def imprimir_tabla(datos):
     console.print(table)
 
 
-def guardar_excel(datos, name="Reporte.xlsx"):
-    df = pd.DataFrame(datos)
-    output_path = os.path.join(os.getcwd(), name)
-    df.to_excel(output_path, index=False)
-    return output_path
+def guardar_excel(datos, nombre="Reporte"):
+    """Guarda datos en archivo Excel en la carpeta de descargas del usuario"""
+    try:
+        df = pd.DataFrame(datos)
+        descargas = obtener_ruta_descargas()
+        output_path = os.path.join(descargas, f"{nombre}_{int(time.time())}.xlsx")
+        df.to_excel(output_path, index=False)
+        return output_path
+    except Exception as e:
+        console.print(f"[bold red]❌ Error al guardar Excel:[/bold red] {e}")
+        return None
+
+
+def guardar_csv(datos, nombre="Reporte"):
+    """Guarda datos en archivo CSV en la carpeta de descargas del usuario"""
+    try:
+        df = pd.DataFrame(datos)
+        descargas = obtener_ruta_descargas()
+        output_path = os.path.join(descargas, f"{nombre}_{int(time.time())}.csv")
+        df.to_csv(output_path, index=False)
+        return output_path
+    except Exception as e:
+        console.print(f"[bold red]❌ Error al guardar CSV:[/bold red] {e}")
+        return None
+
+
+def detectar_tipo_respuesta(contenido):
+    """Detecta si la respuesta es de email, SQL o datos generales"""
+    if isinstance(contenido, dict):
+        claves = [k.lower() for k in contenido.keys()]
+        if any(x in claves for x in ["email", "correo", "mail", "mensaje", "asunto"]):
+            return "email"
+    
+    if isinstance(contenido, list) and len(contenido) > 0:
+        if isinstance(contenido[0], dict):
+            claves = [k.lower() for k in contenido[0].keys()]
+            if any(x in claves for x in ["email", "correo", "mail", "nombre", "teléfono", "dhi"]):
+                return "email"
+    
+    return "generic"
 
 
 # ======================================================
@@ -80,6 +138,7 @@ def esperar_respuesta():
 # 📩 PROCESAR RESPUESTA DE N8N
 # ======================================================
 
+
 def procesar_respuesta(respuesta):
     console.print("\n[bold green]📩 Respuesta del sistema:[/bold green]\n")
 
@@ -93,47 +152,61 @@ def procesar_respuesta(respuesta):
     except:
         contenido = respuesta
 
-    # ============================
-    # Si viene texto simple
-    # ============================
+    tipo_respuesta = detectar_tipo_respuesta(contenido)
+
+    # Texto simple
     if isinstance(contenido, str):
         console.print("[bold cyan]" + contenido.capitalize() + "[/bold cyan]")
-        return
+        return 
     
-    # ============================
-    # Si es tabla (datos en lista)
-    # ============================
+    # Datos en tabla (lista de registros)
     if isinstance(contenido, list):
-
-        # 1️⃣ Mostrar tabla
-        console.print("🗂 [bold cyan]Datos generados:[/bold cyan]\n")
         imprimir_tabla(contenido)
-
-        # 2️⃣ Crear Excel por defecto
+        
+        # Detectar tipo de datos para nombrar el reporte
+        nombre_reporte = "Reporte_Correos" if tipo_respuesta == "email" else "Reporte_Datos"
+        
         try:
-            path = guardar_excel(contenido)
-            console.print(f"\n[bold green]✔ Archivo Excel creado:[/bold green] {path}")
+            console.print("\n[bold yellow]📁 Generando archivo Excel...[/bold yellow]")
+            path = guardar_excel(contenido, nombre_reporte)
+            if path:
+                console.print(f"[bold green]✔ Excel guardado:[/bold green] {path}")
         except Exception as e:
-            console.print(f"[bold red]❌ Error al generar Excel:[/bold red] {e}")
-
-        # 3️⃣ Si la consulta incluye “enviar mail” → Excel especial
-        if "mail" in respuesta.get("accion", "").lower() or \
-           "correo" in respuesta.get("accion", "").lower() or \
-           "gmail" in respuesta.get("accion", "").lower():
-
-            console.print("\n📨 [bold yellow]Preparando archivo para enviar por correo...[/bold yellow]\n")
-
-            try:
-                path_email = guardar_excel(contenido, "Reporte_Email.xlsx")
-                console.print(f"[bold green]📁 Archivo creado para envío por correo:[/bold green] {path_email}")
-                console.print("[bold cyan]📤 El correo fue enviado correctamente.[/bold cyan]")
-            except Exception as e:
-                console.print(f"[bold red]❌ Error al crear archivo para email:[/bold red] {e}")
-
+            console.print("[bold red]❌ Error al generar Excel:[/bold red]", e)
+        
+        try:
+            console.print("[bold yellow]📁 Generando archivo CSV...[/bold yellow]")
+            path_csv = guardar_csv(contenido, nombre_reporte)
+            if path_csv:
+                console.print(f"[bold green]✔ CSV guardado:[/bold green] {path_csv}")
+        except Exception as e:
+            console.print("[bold red]❌ Error al generar CSV:[/bold red]", e)
         return
     
-    # Si no encaja en nada:
+    # Datos en diccionario (email único o resultado único)
+    if isinstance(contenido, dict) and tipo_respuesta == "email":
+        console.print("[bold green]📧 Datos de Correo:[/bold green]")
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("Campo", style="cyan")
+        table.add_column("Valor", style="magenta")
+        
+        for key, value in contenido.items():
+            table.add_row(str(key).upper(), str(value)[:80])  # Limitar longitud de valores
+        
+        console.print(table)
+        
+        # Guardar como CSV
+        try:
+            path_csv = guardar_csv([contenido], "Reporte_Email")
+            if path_csv:
+                console.print(f"[bold green]✔ CSV guardado:[/bold green] {path_csv}")
+        except Exception as e:
+            console.print("[bold red]❌ Error al generar CSV:[/bold red]", e)
+        return
+    
     console.print("[bold cyan]" + str(contenido).capitalize() + "[/bold cyan]")
+
+
 
 
 # ======================================================
